@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kent Mahal - Maintenance & DB Portal</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
+
+    <!-- Top Navbar -->
+    <header class="bg-brand-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <svg class="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                </svg>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight tracking-wide">Kent Mahal</h1>
+                    <p class="text-xs text-brand-200">Google Sheets Connected Portal</p>
+                </div>
+            </div>
+            <div id="user-session-bar" class="hidden flex items-center space-x-4">
+                <span id="session-info" class="text-sm bg-brand-800 px-3 py-1.5 rounded-lg border border-brand-700"></span>
+                <button onclick="openPasswordModal()" class="text-xs bg-brand-700 hover:bg-brand-600 text-white font-medium px-3 py-1.5 rounded-lg transition">Change Password</button>
+                <button onclick="logout()" class="text-xs bg-red-600 hover:bg-red-700 text-white font-medium px-3 py-1.5 rounded-lg transition">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/30 backdrop-blur-xs z-50 flex items-center justify-center">
+            <div class="bg-white px-6 py-4 rounded-2xl shadow-xl flex items-center space-x-3 border border-slate-100">
+                <div class="w-5 h-5 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
+                <span class="text-sm font-semibold text-slate-700">Syncing with Google Sheets...</span>
+            </div>
+        </div>
+
+        <!-- AUTH VIEW -->
+        <div id="auth-view" class="max-w-md mx-auto bg-white rounded-2xl shadow-xl border border-slate-100 p-8 mt-10">
+            <div class="text-center mb-8">
+                <h2 class="text-2xl font-bold text-slate-900">Welcome to Kent Mahal</h2>
+                <p class="text-sm text-slate-500 mt-1">Live Database Connected via Google Sheets</p>
+            </div>
+
+            <div class="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 mb-6">
+                <button id="tab-resident" onclick="switchLoginTab('resident')" class="py-2 text-xs font-semibold rounded-lg bg-white text-brand-900 shadow-sm transition">Resident</button>
+                <button id="tab-admin" onclick="switchLoginTab('admin')" class="py-2 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 transition">Admin</button>
+                <button id="tab-dbadmin" onclick="switchLoginTab('dbadmin')" class="py-2 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 transition">DBAdmin</button>
+            </div>
+
+            <!-- Resident LoginForm -->
+            <form id="form-resident" onsubmit="handleLogin(event, 'resident')" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Search Resident Profile (Flat No)</label>
+                    <input type="text" id="resident-search" oninput="filterResidents()" placeholder="Type to filter flat (e.g. T1-8A1)..." class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs mb-2 focus:ring-2 focus:ring-brand-500">
+                    <select id="resident-username" size="5" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 bg-white">
+                        <!-- Populated dynamically from Sheets -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Password</label>
+                    <input type="password" id="resident-password" required placeholder="Enter password..." class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
+                </div>
+                <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 rounded-xl transition shadow-lg shadow-brand-500/20">Login as Resident</button>
+            </form>
+
+            <!-- Admin LoginForm -->
+            <form id="form-admin" onsubmit="handleLogin(event, 'admin')" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Admin Username</label>
+                    <input type="text" value="admin" disabled class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-500 cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Admin Password</label>
+                    <input type="password" id="admin-password" required placeholder="Enter admin password" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
+                </div>
+                <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-xl transition shadow-lg">Login as Administrator</button>
+            </form>
+
+            <!-- DBAdmin LoginForm -->
+            <form id="form-dbadmin" onsubmit="handleLogin(event, 'dbadmin')" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">DBAdmin Username</label>
+                    <input type="text" value="dbadmin" disabled class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-500 cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">DBAdmin Password</label>
+                    <input type="password" id="dbadmin-password" required placeholder="Enter DBAdmin password" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
+                </div>
+                <button type="submit" class="w-full bg-indigo-900 hover:bg-indigo-800 text-white font-semibold py-2.5 rounded-xl transition shadow-lg">Login as DBAdmin</button>
+            </form>
+
+            <div id="login-error" class="mt-4 text-center text-xs text-red-600 font-medium hidden"></div>
+        </div>
+
+        <!-- RESIDENT PORTAL VIEW -->
+        <div id="resident-view" class="hidden space-y-8">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 class="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                        <svg class="w-5 h-5 text-brand-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Register New Ticket (Sheets DB)
+                    </h3>
+                    <form onsubmit="handleTicketSubmit(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Tower (1 to 6)</label>
+                            <select id="ticket-tower" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm bg-white">
+                                <option value="1">Tower 1</option>
+                                <option value="2">Tower 2</option>
+                                <option value="3">Tower 3</option>
+                                <option value="4">Tower 4</option>
+                                <option value="5">Tower 5</option>
+                                <option value="6">Tower 6</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Apartment Number</label>
+                            <input type="text" id="ticket-apt" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm bg-slate-50">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Start Date of Issue</label>
+                            <input type="date" id="ticket-date" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Issue Description</label>
+                            <textarea id="ticket-desc" rows="3" required placeholder="Describe maintenance problem..." class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm"></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 rounded-xl transition shadow-md">Submit to Google Sheet</button>
+                    </form>
+                </div>
+
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <p class="text-xs text-slate-500 uppercase font-semibold">Total Registered</p>
+                            <p id="stat-total" class="text-2xl font-bold text-slate-900 mt-1">0</p>
+                        </div>
+                        <div class="bg-amber-50 p-4 rounded-xl border border-amber-200 shadow-sm">
+                            <p class="text-xs text-amber-700 uppercase font-semibold">Open / In Progress</p>
+                            <p id="stat-active" class="text-2xl font-bold text-amber-800 mt-1">0</p>
+                        </div>
+                        <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200 shadow-sm">
+                            <p class="text-xs text-emerald-700 uppercase font-semibold">Resolved / Closed</p>
+                            <p id="stat-done" class="text-2xl font-bold text-emerald-800 mt-1">0</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-900">Your Tickets (Fetched from Sheets)</h3>
+                            <span id="resident-ticket-count" class="text-xs bg-slate-100 px-2.5 py-1 rounded-full text-slate-600 font-medium">0 tickets</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-xs uppercase tracking-wider">
+                                        <th class="py-3 px-4">ID</th>
+                                        <th class="py-3 px-4">Tower</th>
+                                        <th class="py-3 px-4">Apartment</th>
+                                        <th class="py-3 px-4">Description</th>
+                                        <th class="py-3 px-4">Date</th>
+                                        <th class="py-3 px-4">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resident-tickets-tbody" class="divide-y divide-slate-100 text-slate-700"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADMIN PORTAL VIEW -->
+        <div id="admin-view" class="hidden space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Admin Control Panel - Association Tickets (Live Sheets DB)</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Status updates instantly write back to the Google Sheet.</p>
+                </div>
+                <button onclick="exportDataAsCSV()" class="inline-flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-xl text-sm transition">
+                    <span>Export to CSV</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-xs text-slate-500 uppercase font-semibold">Total System Tickets</p>
+                    <p id="admin-stat-total" class="text-2xl font-bold text-slate-900 mt-1">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-xs text-amber-600 uppercase font-semibold">Open / In Progress</p>
+                    <p id="admin-stat-open" class="text-2xl font-bold text-amber-600 mt-1">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-xs text-emerald-600 uppercase font-semibold">Resolved / Closed</p>
+                    <p id="admin-stat-resolved" class="text-2xl font-bold text-emerald-600 mt-1">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Filter Status</label>
+                    <select id="admin-status-filter" onchange="renderAdminTicketsTable()" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white">
+                        <option value="ALL">All Statuses</option>
+                        <option value="Registered">Registered</option>
+                        <option value="Open">Open</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Closed">Closed</option>
+                        <option value="Resolved">Resolved</option>
+                        <option value="Rejected">Rejected</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-xs uppercase tracking-wider">
+                                <th class="py-3 px-4">Ticket ID</th>
+                                <th class="py-3 px-4">Resident</th>
+                                <th class="py-3 px-4">Tower</th>
+                                <th class="py-3 px-4">Apt</th>
+                                <th class="py-3 px-4">Description</th>
+                                <th class="py-3 px-4">Date</th>
+                                <th class="py-3 px-4">Status Update</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-tickets-tbody" class="divide-y divide-slate-100 text-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- DBADMIN PORTAL VIEW -->
+        <div id="dbadmin-view" class="hidden space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                        <span>DBAdmin Portal - Google Sheets Live Tables</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-1">Live reflection of the `Tickets` table stored inside your Google Sheet.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="resetDatabaseTable()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-lg border border-slate-300">Reset Sheets to Defaults</button>
+                    <span class="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg font-semibold">Cloud Connected</span>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-left border-collapse text-xs font-mono">
+                        <thead>
+                            <tr class="bg-slate-900 text-white font-bold uppercase tracking-wider">
+                                <th class="py-2.5 px-3">id</th>
+                                <th class="py-2.5 px-3">resident</th>
+                                <th class="py-2.5 px-3">tower</th>
+                                <th class="py-2.5 px-3">apartment</th>
+                                <th class="py-2.5 px-3">start_date</th>
+                                <th class="py-2.5 px-3">status</th>
+                                <th class="py-2.5 px-3">description</th>
+                            </tr>
+                        </thead>
+                        <tbody id="db-raw-tbody" class="divide-y divide-slate-200 bg-slate-50/50 text-slate-800"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- PASSWORD CHANGE MODAL -->
+    <div id="password-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-100">
+            <h3 class="text-lg font-bold text-slate-900 flex items-center justify-between">
+                <span>Change Account Password</span>
+                <button onclick="closePasswordModal()" class="text-slate-400 hover:text-slate-600 text-sm">&times;</button>
+            </h3>
+            <form onsubmit="handlePasswordChange(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Current Password</label>
+                    <input type="password" id="current-pwd" required class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">New Password</label>
+                    <input type="password" id="new-pwd" required class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Confirm New Password</label>
+                    <input type="password" id="confirm-pwd" required class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                </div>
+                <div id="pwd-error" class="text-xs text-red-600 font-medium hidden"></div>
+                <div class="flex space-x-3 pt-2">
+                    <button type="button" onclick="closePasswordModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl text-sm">Cancel</button>
+                    <button type="submit" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 rounded-xl text-sm">Update Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-auto bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        Kent Mahal Apartment Owners Association &bull; Google Sheets Database Portal
+    </footer>
+
+    <!-- Application Script Logic -->
+    <script>
+        // REPLACE WITH YOUR DEPLOYED GOOGLE APPS SCRIPT WEB APP URL
+        const WEB_APP_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
+
+        let cachedCredentials = null;
+        let cachedTickets = [];
+        let currentSession = null;
+        const VALID_STATUSES = ["Registered", "Open", "In Progress", "Closed", "Resolved", "Rejected"];
+
+        function showLoading(show) {
+            const overlay = document.getElementById('loading-overlay');
+            if (show) overlay.classList.remove('hidden');
+            else overlay.classList.add('hidden');
+        }
+
+        async function fetchCredentialsFromSheets() {
+            if (cachedCredentials) return cachedCredentials;
+            showLoading(true);
+            try {
+                const res = await fetch(`${WEB_APP_URL}?action=getCredentials`);
+                const data = await res.json();
+                if (data.status === 'success') {
+                    cachedCredentials = data.credentials;
+                }
+            } catch (err) {
+                console.error("Error fetching credentials:", err);
+                alert("Failed to connect to Google Sheets database. Please check your Web App URL.");
+            } finally {
+                showLoading(false);
+            }
+            return cachedCredentials;
+        }
+
+        async function fetchTicketsFromSheets() {
+            showLoading(true);
+            try {
+                const res = await fetch(`${WEB_APP_URL}?action=getTickets`);
+                const data = await res.json();
+                if (data.status === 'success') {
+                    cachedTickets = data.tickets;
+                }
+            } catch (err) {
+                console.error("Error fetching tickets:", err);
+            } finally {
+                showLoading(false);
+            }
+            return cachedTickets;
+        }
+
+        async function postToSheets(payload) {
+            showLoading(true);
+            try {
+                const res = await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                showLoading(false);
+                return data.status === 'success';
+            } catch (err) {
+                console.error("Error posting to sheets:", err);
+                showLoading(false);
+                alert("Database sync failed. Please check network connection.");
+                return false;
+            }
+        }
+
+        async function populateResidentDropdown(filterText = "") {
+            const creds = await fetchCredentialsFromSheets();
+            if (!creds || !creds.residents) return;
+            const select = document.getElementById('resident-username');
+            select.innerHTML = '';
+
+            const lowerFilter = filterText.toLowerCase();
+            let count = 0;
+            for (let uname in creds.residents) {
+                if (uname.toLowerCase().includes(lowerFilter)) {
+                    const opt = document.createElement('option');
+                    opt.value = uname;
+                    opt.textContent = uname;
+                    select.appendChild(opt);
+                    count++;
+                    if (count > 200 && !lowerFilter) break;
+                }
+            }
+        }
+
+        function filterResidents() {
+            const query = document.getElementById('resident-search').value;
+            populateResidentDropdown(query);
+        }
+
+        function switchLoginTab(role) {
+            const tabRes = document.getElementById('tab-resident');
+            const tabAdm = document.getElementById('tab-admin');
+            const tabDbAdm = document.getElementById('tab-dbadmin');
+            
+            const formRes = document.getElementById('form-resident');
+            const formAdm = document.getElementById('form-admin');
+            const formDbAdm = document.getElementById('form-dbadmin');
+            
+            document.getElementById('login-error').classList.add('hidden');
+
+            tabRes.className = "py-2 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 transition";
+            tabAdm.className = "py-2 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 transition";
+            tabDbAdm.className = "py-2 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 transition";
+
+            formRes.classList.add('hidden');
+            formAdm.classList.add('hidden');
+            formDbAdm.classList.add('hidden');
+
+            if (role === 'resident') {
+                tabRes.className = "py-2 text-xs font-semibold rounded-lg bg-white text-brand-900 shadow-sm transition";
+                formRes.classList.remove('hidden');
+            } else if (role === 'admin') {
+                tabAdm.className = "py-2 text-xs font-semibold rounded-lg bg-white text-slate-900 shadow-sm transition";
+                formAdm.classList.remove('hidden');
+            } else if (role === 'dbadmin') {
+                tabDbAdm.className = "py-2 text-xs font-semibold rounded-lg bg-white text-indigo-900 shadow-sm transition";
+                formDbAdm.classList.remove('hidden');
+            }
+        }
+
+        async function handleLogin(event, role) {
+            event.preventDefault();
+            const errDiv = document.getElementById('login-error');
+            errDiv.classList.add('hidden');
+            const creds = await fetchCredentialsFromSheets();
+
+            if (role === 'resident') {
+                const username = document.getElementById('resident-username').value;
+                const pwd = document.getElementById('resident-password').value;
+                if (!username) {
+                    showError("Please select a resident profile.");
+                    return;
+                }
+                if (creds.residents[username] && creds.residents[username].password === pwd) {
+                    currentSession = { role: 'resident', username: username };
+                    enterApp();
+                } else {
+                    showError("Invalid resident password.");
+                }
+            } else if (role === 'admin') {
+                const pwd = document.getElementById('admin-password').value;
+                if (pwd === creds.admin.password) {
+                    currentSession = { role: 'admin', username: 'Administrator' };
+                    enterApp();
+                } else {
+                    showError("Invalid admin password.");
+                }
+            } else if (role === 'dbadmin') {
+                const pwd = document.getElementById('dbadmin-password').value;
+                if (pwd === creds.dbadmin.password) {
+                    currentSession = { role: 'dbadmin', username: 'DBAdmin' };
+                    enterApp();
+                } else {
+                    showError("Invalid DBAdmin password.");
+                }
+            }
+        }
+
+        function showError(msg) {
+            const errDiv = document.getElementById('login-error');
+            errDiv.textContent = msg;
+            errDiv.classList.remove('hidden');
+        }
+
+        async function enterApp() {
+            document.getElementById('auth-view').classList.add('hidden');
+            document.getElementById('user-session-bar').classList.remove('hidden');
+            document.getElementById('session-info').textContent = `${currentSession.username} (${currentSession.role.toUpperCase()})`;
+
+            document.getElementById('resident-view').classList.add('hidden');
+            document.getElementById('admin-view').classList.add('hidden');
+            document.getElementById('dbadmin-view').classList.add('hidden');
+
+            await fetchTicketsFromSheets();
+
+            if (currentSession.role === 'resident') {
+                document.getElementById('resident-view').classList.remove('hidden');
+                const creds = await fetchCredentialsFromSheets();
+                const profile = creds.residents[currentSession.username];
+                if (profile) {
+                    document.getElementById('ticket-apt').value = profile.flat;
+                    document.getElementById('ticket-tower').value = profile.tower;
+                }
+                renderResidentPortal();
+            } else if (currentSession.role === 'admin') {
+                document.getElementById('admin-view').classList.remove('hidden');
+                renderAdminPortal();
+            } else if (currentSession.role === 'dbadmin') {
+                document.getElementById('dbadmin-view').classList.remove('hidden');
+                renderDatabaseTableViewer();
+            }
+        }
+
+        function logout() {
+            currentSession = null;
+            document.getElementById('user-session-bar').classList.add('hidden');
+            document.getElementById('resident-view').classList.add('hidden');
+            document.getElementById('admin-view').classList.add('hidden');
+            document.getElementById('dbadmin-view').classList.add('hidden');
+            document.getElementById('auth-view').classList.remove('hidden');
+            document.getElementById('resident-password').value = '';
+            document.getElementById('admin-password').value = '';
+            document.getElementById('dbadmin-password').value = '';
+            document.getElementById('resident-search').value = '';
+            populateResidentDropdown();
+        }
+
+        async function handleTicketSubmit(event) {
+            event.preventDefault();
+            const tower = document.getElementById('ticket-tower').value;
+            const apt = document.getElementById('ticket-apt').value.trim();
+            const date = document.getElementById('ticket-date').value;
+            const desc = document.getElementById('ticket-desc').value.trim();
+
+            const newId = `KM-${Math.floor(1000 + Math.random() * 9000)}`;
+            const newTicket = {
+                id: newId,
+                resident: currentSession.username,
+                tower: tower,
+                apt: apt,
+                date: date,
+                status: "Registered",
+                desc: desc
+            };
+
+            const success = await postToSheets({ action: 'addTicket', ticket: newTicket });
+            if (success) {
+                document.getElementById('ticket-desc').value = '';
+                document.getElementById('ticket-date').value = '';
+                await fetchTicketsFromSheets();
+                renderResidentPortal();
+                alert(`Ticket successfully registered & saved to Google Sheets! ID: ${newId}`);
+            }
+        }
+
+        async function updateTicketStatus(ticketId, newStatus) {
+            const success = await postToSheets({ action: 'updateStatus', ticketId: ticketId, status: newStatus });
+            if (success) {
+                await fetchTicketsFromSheets();
+                if (currentSession && currentSession.role === 'admin') {
+                    renderAdminTicketsTable();
+                }
+            }
+        }
+
+        async function resetDatabaseTable() {
+            if (confirm("Are you sure you want to reset the Google Sheet tickets to initial sample records?")) {
+                const success = await postToSheets({ action: 'resetTickets' });
+                if (success) {
+                    await fetchTicketsFromSheets();
+                    renderDatabaseTableViewer();
+                    alert("Google Sheet tickets table has been reset successfully.");
+                }
+            }
+        }
+
+        function renderResidentPortal() {
+            const myTickets = cachedTickets.filter(t => t.resident === currentSession.username);
+            const total = myTickets.length;
+            const active = myTickets.filter(t => ['Registered', 'Open', 'In Progress'].includes(t.status)).length;
+            const done = myTickets.filter(t => ['Closed', 'Resolved', 'Rejected'].includes(t.status)).length;
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-active').textContent = active;
+            document.getElementById('stat-done').textContent = done;
+            document.getElementById('resident-ticket-count').textContent = `${total} ticket${total === 1 ? '' : 's'}`;
+
+            const tbody = document.getElementById('resident-tickets-tbody');
+            tbody.innerHTML = '';
+
+            if (myTickets.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-400">No tickets registered yet.</td></tr>`;
+                return;
+            }
+
+            myTickets.forEach(t => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3 px-4 font-semibold text-slate-900">${t.id}</td>
+                        <td class="py-3 px-4"><span class="bg-indigo-50 text-indigo-700 font-semibold px-2.5 py-1 rounded text-xs">Tower ${t.tower}</span></td>
+                        <td class="py-3 px-4 font-medium text-slate-700">#${t.apt}</td>
+                        <td class="py-3 px-4 max-w-xs truncate" title="${t.desc}">${t.desc}</td>
+                        <td class="py-3 px-4 text-xs text-slate-500">${t.date}</td>
+                        <td class="py-3 px-4">${getStatusBadge(t.status)}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderAdminPortal() {
+            renderAdminTicketsTable();
+        }
+
+        function renderAdminTicketsTable() {
+            const filter = document.getElementById('admin-status-filter').value;
+            const total = cachedTickets.length;
+            const openCount = cachedTickets.filter(t => ['Registered', 'Open', 'In Progress'].includes(t.status)).length;
+            const resolvedCount = cachedTickets.filter(t => ['Closed', 'Resolved'].includes(t.status)).length;
+
+            document.getElementById('admin-stat-total').textContent = total;
+            document.getElementById('admin-stat-open').textContent = openCount;
+            document.getElementById('admin-stat-resolved').textContent = resolvedCount;
+
+            const filteredTickets = filter === 'ALL' ? cachedTickets : cachedTickets.filter(t => t.status === filter);
+            const tbody = document.getElementById('admin-tickets-tbody');
+            tbody.innerHTML = '';
+
+            if (filteredTickets.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">No tickets found.</td></tr>`;
+                return;
+            }
+
+            filteredTickets.forEach(t => {
+                let optionsHtml = VALID_STATUSES.map(s => `<option value="${s}" ${t.status === s ? 'selected' : ''}>${s}</option>`).join('');
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3 px-4 font-semibold text-slate-900">${t.id}</td>
+                        <td class="py-3 px-4 text-xs font-medium text-indigo-600">${t.resident}</td>
+                        <td class="py-3 px-4"><span class="bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded text-xs">Tower ${t.tower}</span></td>
+                        <td class="py-3 px-4 font-medium text-slate-700">#${t.apt}</td>
+                        <td class="py-3 px-4 max-w-xs truncate" title="${t.desc}">${t.desc}</td>
+                        <td class="py-3 px-4 text-xs text-slate-500">${t.date}</td>
+                        <td class="py-3 px-4">
+                            <select onchange="updateTicketStatus('${t.id}', this.value)" class="rounded-lg border border-slate-300 px-2 py-1 text-xs bg-white font-medium">
+                                ${optionsHtml}
+                            </select>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderDatabaseTableViewer() {
+            const dbTbody = document.getElementById('db-raw-tbody');
+            if (!dbTbody) return;
+            dbTbody.innerHTML = '';
+
+            if (cachedTickets.length === 0) {
+                dbTbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-slate-400">Google Sheets database table is empty.</td></tr>`;
+                return;
+            }
+
+            cachedTickets.forEach(t => {
+                dbTbody.innerHTML += `
+                    <tr class="hover:bg-slate-100/80 transition">
+                        <td class="py-2.5 px-3 font-bold text-indigo-700">${t.id}</td>
+                        <td class="py-2.5 px-3 text-slate-600">${t.resident}</td>
+                        <td class="py-2.5 px-3 text-slate-700 font-semibold">${t.tower}</td>
+                        <td class="py-2.5 px-3 text-slate-700">#${t.apt}</td>
+                        <td class="py-2.5 px-3 text-slate-500">${t.date}</td>
+                        <td class="py-2.5 px-3"><span class="font-semibold text-brand-700">${t.status}</span></td>
+                        <td class="py-2.5 px-3 text-slate-600 max-w-xs truncate" title="${t.desc}">${t.desc}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function getStatusBadge(status) {
+            const classes = {
+                "Registered": "bg-blue-50 text-blue-700 border-blue-200",
+                "Open": "bg-yellow-50 text-yellow-700 border-yellow-200",
+                "In Progress": "bg-orange-50 text-orange-700 border-orange-200",
+                "Closed": "bg-emerald-50 text-emerald-700 border-emerald-200",
+                "Resolved": "bg-green-50 text-green-700 border-green-200",
+                "Rejected": "bg-red-50 text-red-700 border-red-200"
+            };
+            const cls = classes[status] || "bg-slate-100 text-slate-700 border-slate-200";
+            return `<span class="px-2.5 py-1 rounded-full text-xs font-medium border ${cls}">${status}</span>`;
+        }
+
+        function openPasswordModal() {
+            document.getElementById('current-pwd').value = '';
+            document.getElementById('new-pwd').value = '';
+            document.getElementById('confirm-pwd').value = '';
+            document.getElementById('pwd-error').classList.add('hidden');
+            document.getElementById('password-modal').classList.remove('hidden');
+        }
+
+        function closePasswordModal() {
+            document.getElementById('password-modal').classList.add('hidden');
+        }
+
+        async function handlePasswordChange(event) {
+            event.preventDefault();
+            const curr = document.getElementById('current-pwd').value;
+            const fresh = document.getElementById('new-pwd').value;
+            const confirm = document.getElementById('confirm-pwd').value;
+            const errEl = document.getElementById('pwd-error');
+            errEl.classList.add('hidden');
+
+            if (fresh !== confirm) {
+                errEl.textContent = "New passwords do not match.";
+                errEl.classList.remove('hidden');
+                return;
+            }
+
+            const creds = await fetchCredentialsFromSheets();
+            let roleKey = currentSession.role === 'admin' ? 'admin' : (currentSession.role === 'dbadmin' ? 'dbadmin' : currentSession.username);
+            let currentStoredPwd = currentSession.role === 'admin' ? creds.admin.password : (currentSession.role === 'dbadmin' ? creds.dbadmin.password : creds.residents[currentSession.username].password);
+
+            if (currentStoredPwd !== curr) {
+                errEl.textContent = "Current password is incorrect.";
+                errEl.classList.remove('hidden');
+                return;
+            }
+
+            const success = await postToSheets({ action: 'updatePassword', role: roleKey, newPassword: fresh });
+            if (success) {
+                alert("Password updated successfully in Google Sheets!");
+                cachedCredentials = null; // clear cache
+                closePasswordModal();
+            }
+        }
+
+        function exportDataAsCSV() {
+            if (cachedTickets.length === 0) {
+                alert("No ticket data available.");
+                return;
+            }
+            let csvContent = "Ticket ID,Resident,Tower,Apartment,Start Date,Status,Description\n";
+            cachedTickets.forEach(t => {
+                const cleanDesc = `"${t.desc.replace(/"/g, '""')}"`;
+                csvContent += `${t.id},${t.resident},${t.tower},${t.apt},${t.date},${t.status},${cleanDesc}\n`;
+            });
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `Kent_Mahal_Tickets_${new Date().toISOString().split('T')[0]}.csv`);
+            a.click();
+        }
+
+        // Initialize App
+        (async function init() {
+            await fetchCredentialsFromSheets();
+            await populateResidentDropdown();
+            await fetchTicketsFromSheets();
+        })();
+    </script>
+</body>
+</html>
